@@ -1,13 +1,13 @@
-# HTPC Download Box
+# Media Server Box
 
-Sonarr / Radarr / Jackett / NZBGet / Deluge / OpenVPN / Plex
+Sonarr / Radarr / Lidarr / Jackett / Bazarr / SABnzbd / Plex
 
 TV shows and movies download, sort, with the desired quality and subtitles, behind a VPN (optional), ready to watch, in a beautiful media player.
 All automated.
 
 ## Table of Contents
 
-- [HTPC Download Box](#htpc-download-box)
+- [Media Server Box](#htpc-download-box)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
     - [Monitor TV shows/movies with Sonarr and Radarr](#monitor-tv-showsmovies-with-sonarr-and-radarr)
