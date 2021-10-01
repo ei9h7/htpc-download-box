@@ -1,101 +1,262 @@
-version: "3.4"
+#Requirement: Set environmental variables: USERDIR, PUID, PGID, MYSQL_ROOT_PASSWORD, and TZ in .env
+
+version: "3.6"
 services:
-  vpn:
-    container_name: vpn
-    image: dperson/openvpn-client:latest
-    cap_add:
-      - net_admin # required to modify network interfaces
-    restart: unless-stopped
-    volumes:
-      - /dev/net:/dev/net:z # tun device
-      - ${ROOT}/config/vpn:/vpn # OpenVPN configuration
-    security_opt:
-      - label:disable
+
+######### FRONTENDS ##########
+
+ #Portainer - WebUI for Containers
+  portainer:
+    image: portainer/portainer
+    hostname: portainer
+    container_name: portainer
+    restart: always
+    command: -H unix:///var/run/docker.sock
     ports:
-      - 8112:8112 # port for deluge web UI to be reachable from local network
-    command: '-f "" -r 192.168.1.0/24' # enable firewall and route local network traffic
-
-  deluge:
-    container_name: deluge
-    image: linuxserver/deluge:latest
-    restart: unless-stopped
-    network_mode: service:vpn # run on the vpn network
-    environment:
-      - PUID=${PUID} # default user id, defined in .env
-      - PGID=${PGID} # default group id, defined in .env
-      - TZ=${TZ} # timezone, defined in .env
+      - "9000:9000"
     volumes:
-      - ${ROOT}/downloads:/downloads # downloads folder
-      - ${ROOT}/config/deluge:/config # config files
-
-  jackett:
-    container_name: jackett
-    image: linuxserver/jackett:latest
-    restart: unless-stopped
-    network_mode: host
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERDIR}/config/portainer/data:/data
     environment:
-      - PUID=${PUID} # default user id, defined in .env
-      - PGID=${PGID} # default group id, defined in .env
-      - TZ=${TZ} # timezone, defined in .env
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ${ROOT}/downloads/torrent-blackhole:/downloads # place where to put .torrent files for manual download
-      - ${ROOT}/config/jackett:/config # config files
+      - TZ=${TZ}
 
-  nzbget:
-    container_name: nzbget
-    image: linuxserver/nzbget:latest
-    restart: unless-stopped
-    network_mode: host
+# Organizer - Unified HTPC/Home Server Web Interface
+  organizr:
+    container_name: organizr
+    hostname: organizr
+    restart: always
+    image: lsiocommunity/organizr
+    volumes:
+      - ${USERDIR}/config/organizr:/config
+      - ${USERDIR}/config/shared:/shared
+    ports:
+      - "80:80"
     environment:
-      - PUID=${PUID} # default user id, defined in .env
-      - PGID=${PGID} # default group id, defined in .env
-      - TZ=${TZ} # timezone, defined in .env
-    volumes:
-      - ${ROOT}/downloads:/downloads # download folder
-      - ${ROOT}/config/nzbget:/config # config files
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
 
-  sonarr:
-    container_name: sonarr
-    image: linuxserver/sonarr:latest
-    restart: unless-stopped
-    network_mode: host
+# WebUI for MariaDB
+#   phpmyadmin:
+#     hostname: phpmyadmin
+#     container_name: phpmyadmin
+#     image: phpmyadmin/phpmyadmin
+#     restart: always
+#     links:
+#       - mariadb:db
+#     ports:
+#       - XXXX:80
+#     environment:
+#       - PMA_HOST=mariadb
+#       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+
+######### DOCKER RELATED ##########
+
+# Watchtower - Automatic Update of Containers/Apps
+#   watchtower:
+#     container_name: watchtower
+#     hostname: watchtower
+#     restart: always
+#     image: v2tec/watchtower
+#     volumes:
+#       - /var/run/docker.sock:/var/run/docker.sock
+#     command: --schedule "0 0 4 * * *" --cleanup
+
+######### SMART HOME APPS ##########
+
+# Home Assistant - Smart Home Hub
+#   homeassistant:
+#     container_name: homeassistant
+#     hostname: hass
+#     restart: always
+#     image: homeassistant/home-assistant
+#     devices:
+#       - /dev/ttyUSB0:/dev/ttyUSB0
+#       - /dev/ttyUSB1:/dev/ttyUSB1
+#       - /dev/ttyACM0:/dev/ttyACM0
+#     volumes:
+#       - ${USERDIR}/config/homeassistant:/config
+#       - /etc/localtime:/etc/localtime:ro
+#       - shared:/shared
+#     ports:
+#       - "XXXX:8123"
+#     privileged: true
+#     environment:
+#       - PUID=${PUID}
+#     - PGID=${PGID}
+#       - TZ=${TZ}
+
+######### DOWNLOADERS ##########
+
+# Transmission with VPN – Bittorrent Downloader
+#   transmission-vpn:
+#     container_name: transmission-vpn
+#     hostname: transmission
+#     image: haugene/transmission-openvpn
+#     cap_add:
+#       - NET_ADMIN
+#     devices:
+#       - /dev/net/tun
+#     restart: always
+#     ports:
+#     - "XXXX:9091"
+#     dns:
+#       - 1.1.1.1
+#       - 1.0.0.1
+#     volumes:
+#       - /etc/localtime:/etc/localtime:ro
+#       - ${USERDIR}/config/transmission-vpn:/data
+#     - ${USERDIR}/config/shared:/shared
+#       - ${USERDIR}/downloads:/data/watch
+#       - ${USERDIR}/downloads/completed:/data/completed
+#       - ${USERDIR}/downloads/incomplete:/data/incomplete
+#     environment:
+#       - OPENVPN_PROVIDER=IPVANISH
+#       - OPENVPN_USERNAME=ipvanish_username
+#       - OPENVPN_PASSWORD=ipvanish_password
+#       - OPENVPN_CONFIG="YYYYYYYYYYY"
+#       - OPENVPN_OPTS=--inactive 3600 --ping 10 --ping-exit 60
+#       - LOCAL_NETWORK=192.168.1.0/24
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+#       - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=true
+#       - TRANSMISSION_RPC_HOST_WHITELIST="127.0.0.1,192.168.*.*"
+#       - TRANSMISSION_RPC_PASSWORD=${TRANSMISSION_RPC_PASSWORD}
+#       - TRANSMISSION_RPC_USERNAME=${TRANSMISSION_RPC_USERNAME}
+#       - TRANSMISSION_UMASK=002
+#       - TRANSMISSION_RATIO_LIMIT=0.01
+#       - TRANSMISSION_RATIO_LIMIT_ENABLED=true
+#       - TRANSMISSION_ALT_SPEED_DOWN=2000
+#       - TRANSMISSION_ALT_SPEED_ENABLED=true
+#       - TRANSMISSION_ALT_SPEED_UP=15
+#       - TRANSMISSION_SPEED_LIMIT_DOWN=6000
+#       - TRANSMISSION_SPEED_LIMIT_DOWN_ENABLED=true
+#       - TRANSMISSION_SPEED_LIMIT_UP=30
+#       - TRANSMISSION_SPEED_LIMIT_UP_ENABLED=true
+#       - TRANSMISSION_INCOMPLETE_DIR=/downloads/incomplete
+#       - TRANSMISSION_INCOMPLETE_DIR_ENABLED=true
+#       - TRANSMISSION_WATCH_DIR=/downloads
+#       - TRANSMISSION_WATCH_DIR_ENABLED=true
+#       - TRANSMISSION_DOWNLOAD_DIR=/downloads/completed
+
+# qBittorrent without VPN – Bittorrent Downloader (Alternative)
+#   qbittorrent:
+#     image: "linuxserver/qbittorrent"
+#     hostname: qbittorrent
+#     container_name: "qbittorrent"
+#     volumes:
+#       - ${USERDIR}/config/qbittorrent:/config
+#       - ${USERDIR}/downloads/completed:/downloads
+#       - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:XXXX"
+#       - "6881:6881"
+#       - "6881:6881/udp"
+#     restart: always
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+#       - UMASK_SET=002
+#       - WEBUI_PORT=XXXX
+
+# SABnzbd – Usenet (NZB) Downloader
+  sabnzbd:
+    image: "linuxserver/sabnzbd"
+    hostname: sabnzbd
+    container_name: "sabnzbd"
+    volumes:
+      - ${USERDIR}/config/sabnzbd:/config
+      - ${USERDIR}/downloads/completed:/downloads
+      - ${USERDIR}/downloads/incomplete:/incomplete-downloads
+      - ${USERDIR}/config/shared:/shared
+#     ports:
+#         - "XXXX:8080"
+    restart: always
     environment:
-      - PUID=${PUID} # default user id, defined in .env
-      - PGID=${PGID} # default group id, defined in .env
-      - TZ=${TZ} # timezone, defined in .env
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ${ROOT}/config/sonarr:/config # config files
-      - ${ROOT}/complete/tv:/tv # tv shows folder
-      - ${ROOT}/downloads:/downloads # download folder
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
 
+# NZBGet – Usenet (NZB) Downloader (Alternative)
+#   nzbget:
+#     image: "linuxserver/nzbget"
+#     hostname: nzbget
+#     container_name: "nzbget"
+#     volumes:
+#     - ${USERDIR}/config/sabnzbd:/config
+#       - ${USERDIR}/downloads:/downloads
+#       - ${USERDIR}/downloads/incomplete:/incomplete-downloads
+#       - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:6789"
+#     restart: always
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+
+
+######### PERSONAL VIDEO RECORDERS ##########
+
+# Radarr – Movie Download and Management
   radarr:
-    container_name: radarr
-    image: linuxserver/radarr:latest
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      - PUID=${PUID} # default user id, defined in .env
-      - PGID=${PGID} # default group id, defined in .env
-      - TZ=${TZ} # timezone, defined in .env
+    image: "linuxserver/radarr"
+    hostname: radarr
+    container_name: "radarr"
     volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - ${ROOT}/config/radarr:/config # config files
-      - ${ROOT}/complete/movies:/movies # movies folder
-      - ${ROOT}/downloads:/downloads # download folder
+      - ${USERDIR}/config/radarr:/config
+      - ${USERDIR}/downloads/completed:/data/downloads
+      - ${USERDIR}/media/movies:/data/media/movies
 
-  plex-server:
-    container_name: plex-server
-    image: plexinc/pms-docker:latest
-    restart: unless-stopped
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:7878"
+    restart: always
     environment:
-      - TZ=${TZ} # timezone, defined in .env
-    network_mode: host
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+# Sonarr – TV Show Download and Management
+  sonarr:
+    image: "linuxserver/sonarr"
+    hostname: sonarr
+    container_name: "sonarr"
     volumes:
-      - ${ROOT}/config/plex/db:/config # plex database
-      - ${ROOT}/config/plex/transcode:/transcode # temp transcoded files
-      - ${ROOT}/complete:/data # media library
+      - ${USERDIR}/config/sonarr:/config
+      - ${USERDIR}/downloads/completed:/data/downloads
+      - ${USERDIR}/media/tvshows:/data/media/tv
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/config/shared:/shared
+#     ports:
+#         - "XXXX:8989"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+#LIDARR - Music Download and Management
+  lidarr:
+    image: "linuxserver/lidarr"
+    hostname: lidarr
+    container_name: "lidarr"
+    volumes:
+      - ${USERDIR}/config/lidarr:/config
+      - ${USERDIR}/downloads:/data/downloads
+      - ${USERDIR}/media/music:/data/media/music
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:8686"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
 
   bazarr:
     container_name: bazarr
@@ -108,8 +269,146 @@ services:
       - TZ=${TZ} # timezone, defined in .env
       - UMASK_SET=022 #optional
     volumes:
-      - ${ROOT}/config/bazarr:/config # config files
-      - ${ROOT}/complete/movies:/movies # movies folder
-      - ${ROOT}/complete/tv:/tv # tv shows folder
+      - ${USERDIR}/config/bazarr:/config # config files
+      - ${USERDIR}/media/movies:/movies # movies folder
+      - ${USERDIR}/media/tv:/tv # tv shows folder
     ports:
       - 6767:6767
+
+######### MEDIA SERVER APPS ##########
+
+# Plex Media Server
+  plexms:
+    container_name: plexms
+    hostname: plexms
+    restart: always
+    image: plexinc/pms-docker
+    volumes:
+      - ${USERDIR}/config/plexms:/config
+      - ${USERDIR}/media/plex_tmp:/transcode
+      - ${USERDIR}/media:/media
+      - ${USERDIR}/config/shared:/shared
+    ports:
+      - "32400:32400/tcp"
+      - "3005:3005/tcp"
+      - "8324:8324/tcp"
+      - "32469:32469/tcp"
+      - "1900:1900/udp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+    environment:
+      - TZ=${TZ}
+      - HOSTNAME="Docker Plex"
+      - PLEX_CLAIM="claim-YYYYYYYYY"
+      - PLEX_UID=${PUID}
+      - PLEX_GID=${PGID}
+      - ADVERTISE_IP="http://SERVER-IP:32400/"
+
+# Tautulli (aka PlexPy) – Monitoring Plex Usage
+#   tautulli:
+#     container_name: tautulli
+#     hostname: tautulli
+#     restart: always
+#     image: linuxserver/tautulli
+#     volumes:
+#       - ${USERDIR}/config/tautulli/config:/config
+#       - ${USERDIR}/config/tautulli/logs:/logs:ro
+#       - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:8181"
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+
+# Ombi – Accept Requests for your Media Server
+  ombi:
+    container_name: ombi
+    hostname: ombi
+    restart: always
+    image: linuxserver/ombi
+    volumes:
+      - ${USERDIR}/config/ombi:/config
+      - ${USERDIR}/config/shared:/shared
+#    ports:
+#      - "XXXX:3579"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+######### SEARCHERS ##########
+
+# NZBHydra – NZB Meta Search
+  hydra:
+    image: "linuxserver/hydra"
+    hostname: hydra
+    container_name: "hydra"
+    volumes:
+      - ${USERDIR}/config/hydra:/config
+      - ${USERDIR}/downloads:/downloads
+      - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:5075"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+
+# Jackett – Torrent Proxy
+#   jackett:
+#     image: "linuxserver/jackett"
+#     hostname: jackett
+#     container_name: "jackett"
+#     volumes:
+#       - ${USERDIR}/config/jackett:/config
+#       - ${USERDIR}/downloads/completed:/downloads
+#       - "/etc/localtime:/etc/localtime:ro"
+#       - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:9117"
+#     restart: always
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+
+######### UTILITIES ##########
+
+# MariaDB – Database Server for your Apps
+#   mariadb:
+#     image: "linuxserver/mariadb"
+#     container_name: "mariadb"
+#     hostname: mariadb
+#     volumes:
+#         - ${USERDIR}/config/mariadb:/config
+#     ports:
+#       - target: 3306
+#         published: 3306
+#         protocol: tcp
+#         mode: host
+#     restart: always
+#     environment:
+#       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+#       - PUID=${PUID}
+#       - PGID=${PGID}
+#       - TZ=${TZ}
+
+# NextCloud – Your Own Cloud Storage
+#   nextcloud:
+#     container_name: nextcloud
+#     hostname: nextcloud
+#     restart: always
+#     image: linuxserver/nextcloud
+#     volumes:
+#       - ${USERDIR}/config/nextcloud:/config
+#       - ${USERDIR}/shared_data:/data
+#       - ${USERDIR}/config/shared:/shared
+#     ports:
+#       - "XXXX:443"
+#     environment:
+#       - PUID=${PUID}
+#       - PGID=${PGID}
